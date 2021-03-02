@@ -87,7 +87,11 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	if (!g_socket_connect(sock, gaddr, NULL, NULL)) {
 		gchar *argv[] = { "adblock-rust-server", NULL };
 		gint out;
-		g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL);
+
+		// "disable" extension if server can't be started
+		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL))
+			return;
+
 		GIOChannel * out_chan = g_io_channel_unix_new(out);
 		gchar *line;
 		g_io_channel_read_line(out_chan, &line, NULL, NULL, NULL);
