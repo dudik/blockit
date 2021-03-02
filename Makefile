@@ -1,7 +1,7 @@
 all: blockit.so
 
 blockit.so: blockit.c
-	$(CC) blockit.c -fPIC -shared `pkg-config --cflags webkit2gtk-4.0` -o $@
+	$(CC) blockit.c -Wall -fPIC -shared `pkg-config --cflags webkit2gtk-4.0` -o $@
 
 install: all
 	mkdir -p /usr/lib/blockit

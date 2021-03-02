@@ -6,35 +6,33 @@ GSocket *sock;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
-	const char *request_uri;
-	const char *page_uri;
-	SoupMessageHeaders *headers;
-
-	headers = webkit_uri_request_get_http_headers(request);
-	request_uri = webkit_uri_request_get_uri(request);
-	page_uri = webkit_web_page_get_uri(web_page);
+	const char *request_uri = webkit_uri_request_get_uri(request);
+	const char *page_uri = webkit_web_page_get_uri(web_page);
 
 	gchar * path;
 	g_uri_split(request_uri, G_URI_FLAGS_NONE, NULL, NULL, NULL, NULL, &path, NULL, NULL, NULL);
 
-	GString *res_type;
+	const gchar *res_type;
 	if (g_str_has_suffix(path, ".js"))
-		res_type = g_string_new("script");
+		res_type = "script";
 	else if (g_str_has_suffix(path, ".css"))
-		res_type = g_string_new("stylesheet");
-	else if (g_str_has_suffix(path, ".jpg") || g_str_has_suffix(path, ".png") || g_str_has_suffix(path, ".svg"))
-		res_type = g_string_new("image");
+		res_type = "stylesheet";
+	else if (g_str_has_suffix(path, ".jpg") || g_str_has_suffix(path, ".png") || g_str_has_suffix(path, ".svg") || g_str_has_suffix(path, ".gif"))
+		res_type = "image";
 	else if (g_str_has_suffix(path, ".ttf") || g_str_has_suffix(path, ".otf") || g_str_has_suffix(path, ".woff") || g_str_has_suffix(path, ".woff2"))
-		res_type = g_string_new("font");
+		res_type = "font";
 	else
-		res_type = g_string_new("other");
+		res_type = "other";
 
-	gchar *req = g_strdup_printf("n %s %s %s\n", request_uri, page_uri, res_type->str);
+	g_free(path);
+
+	gchar *req = g_strdup_printf("n %s %s %s\n", request_uri, page_uri, res_type);
 	g_socket_send_with_blocking(sock, req, strlen(req), TRUE, NULL, NULL);
+	g_free(req);
 	gchar buffer[1] = { 0 };
 	g_socket_receive_with_blocking(sock, buffer, 1, TRUE, NULL, NULL);
-	gboolean is_ad = buffer[0] == '1';
-	return is_ad;
+	// server returns '1' if the resource is an ad
+	return buffer[0] == '1';
 }
 
 static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data)
@@ -46,6 +44,7 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	JSCValue *ids = jsc_context_evaluate(js_context, "Array.from(document.getElementsByTagName('*')).map(elem => elem.id).filter(elem => elem).join('\t')", -1);
 	gchar *req = g_strdup_printf("c %s %s %s\n", uri, jsc_value_to_string(ids), jsc_value_to_string(classes));
 	g_socket_send_with_blocking(sock, req, strlen(req), TRUE, NULL, NULL);
+	g_free(req);
 
 	GString *res = g_string_new("");
 	char *end = NULL;
@@ -64,7 +63,8 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	{
 		g_string_prepend(res, "var style = document.createElement('style');style.type = 'text/css';style.appendChild(document.createTextNode(`");
 		g_string_append(res, "`));document.head.appendChild(style);");
-		JSCValue *js_value = jsc_context_evaluate(js_context, res->str, -1);
+		jsc_context_evaluate(js_context, res->str, -1);
+		g_string_free(res, TRUE);
 	}
 }
 
@@ -83,6 +83,7 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	strcpy(addr.sun_path, "/tmp/ars");
 	GSocketAddress *gaddr = g_socket_address_new_from_native(&addr, sizeof(addr));
 	g_socket_connect(sock, gaddr, NULL, NULL);
+	g_object_unref(gaddr);
 
 	// TODO check if server is running
 	/* if (g_socket_send_with_blocking(sock, "test", 4, TRUE, NULL, NULL) == -1) { */
