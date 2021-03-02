@@ -82,13 +82,21 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	memset(addr.sun_path, 0, sizeof(addr.sun_path));
 	strcpy(addr.sun_path, "/tmp/ars");
 	GSocketAddress *gaddr = g_socket_address_new_from_native(&addr, sizeof(addr));
-	g_socket_connect(sock, gaddr, NULL, NULL);
+
+	// spawn server if it's not running
+	if (!g_socket_connect(sock, gaddr, NULL, NULL)) {
+		gchar *argv[] = { "adblock-rust-server", NULL };
+		gint out;
+		g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL);
+		GIOChannel * out_chan = g_io_channel_unix_new(out);
+		gchar *line;
+		g_io_channel_read_line(out_chan, &line, NULL, NULL, NULL);
+		g_free(line);
+		g_io_channel_unref(out_chan);
+		g_socket_connect(sock, gaddr, NULL, NULL);
+	}
+
 	g_object_unref(gaddr);
-
-	// TODO check if server is running
-	/* if (g_socket_send_with_blocking(sock, "test", 4, TRUE, NULL, NULL) == -1) { */
-
-	/* } */
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 }
