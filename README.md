@@ -12,13 +12,13 @@ git clone https://github.com/dudik/blockit
 cd blockit
 sudo make install
 ```
-3. Link the library located at `/usr/lib/blockit/blockit.so` with the WebKitGTK based browser you want to use:
+3. Link the library located at `/usr/local/lib/blockit.so` with the WebKitGTK based browser you want to use:
 ```
-sudo ln -s /usr/lib/blockit/blockit.so /usr/lib/example-browser
+sudo ln -s /usr/local/lib/blockit.so /usr/lib/example-browser
 ```
 The target folder is different for each browser. The locations can be found at [wyebadblock's Github page](https://github.com/jun7/wyebadblock#addition-for-other-webkit2gtk-browsers).
 
-The server should automatically start when you open your browser. If not, try starting it manually:
+The server should start automatically when you open your browser. If not, try starting it manually:
 ```
 adblock-rust-server
 ```
