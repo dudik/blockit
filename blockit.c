@@ -9,7 +9,7 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 	const char *request_uri = webkit_uri_request_get_uri(request);
 	const char *page_uri = webkit_web_page_get_uri(web_page);
 
-	gchar * path;
+	gchar *path;
 	g_uri_split(request_uri, G_URI_FLAGS_NONE, NULL, NULL, NULL, NULL, &path, NULL, NULL, NULL);
 
 	const gchar *res_type;
@@ -29,7 +29,7 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 	gchar *req = g_strdup_printf("n %s %s %s\n", request_uri, page_uri, res_type);
 	g_socket_send_with_blocking(sock, req, strlen(req), TRUE, NULL, NULL);
 	g_free(req);
-	gchar buffer[1] = { 0 };
+	gchar buffer[1] = {0};
 	g_socket_receive_with_blocking(sock, buffer, 1, TRUE, NULL, NULL);
 	// server returns '1' if the resource is an ad
 	return buffer[0] == '1';
@@ -38,7 +38,7 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data)
 {
 	WebKitFrame *frame = webkit_web_page_get_main_frame(web_page);
-	JSCContext * js_context = webkit_frame_get_js_context(frame);
+	JSCContext *js_context = webkit_frame_get_js_context(frame);
 	const gchar *uri = webkit_web_page_get_uri(web_page);
 	JSCValue *classes = jsc_context_evaluate(js_context, "Array.from(new Set([].concat.apply([], Array.from(document.getElementsByTagName('*')).map(elem => Array.from(elem.classList))))).join('\t')", -1);
 	JSCValue *ids = jsc_context_evaluate(js_context, "Array.from(document.getElementsByTagName('*')).map(elem => elem.id).filter(elem => elem).join('\t')", -1);
@@ -61,8 +61,12 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 
 	if (res->len > 1)
 	{
-		g_string_prepend(res, "var style = document.createElement('style');style.type = 'text/css';style.appendChild(document.createTextNode(`");
-		g_string_append(res, "`));document.head.appendChild(style);");
+		g_string_prepend(res, "var link = document.createElement('link');"
+				"link.rel = 'stylesheet';"
+				"link.href = 'a';"
+				"document.head.appendChild(link);"
+				"window.onload = function () { link.sheet.insertRule(`");
+		g_string_append(res, "`); }");
 		jsc_context_evaluate(js_context, res->str, -1);
 		g_string_free(res, TRUE);
 	}
@@ -84,15 +88,16 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	GSocketAddress *gaddr = g_socket_address_new_from_native(&addr, sizeof(addr));
 
 	// spawn server if it's not running
-	if (!g_socket_connect(sock, gaddr, NULL, NULL)) {
-		gchar *argv[] = { "adblock-rust-server", NULL };
+	if (!g_socket_connect(sock, gaddr, NULL, NULL))
+	{
+		gchar *argv[] = {"adblock-rust-server", NULL};
 		gint out;
 
 		// "disable" extension if server can't be started
 		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL))
 			return;
 
-		GIOChannel * out_chan = g_io_channel_unix_new(out);
+		GIOChannel *out_chan = g_io_channel_unix_new(out);
 		gchar *line;
 		g_io_channel_read_line(out_chan, &line, NULL, NULL, NULL);
 		g_free(line);
