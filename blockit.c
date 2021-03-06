@@ -72,10 +72,31 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	}
 }
 
+static void open_adblock_settings(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+	g_print("Opened settings\n");
+}
+
+static gboolean context_menu_opened_callback(WebKitWebPage *web_page, WebKitContextMenu *context_menu, WebKitWebHitTestResult *hit_test_result, gpointer user_data)
+{
+	g_print("Context menu opened\n");
+
+	webkit_context_menu_append(context_menu, webkit_context_menu_item_new_separator());
+
+	GSimpleAction *action = g_simple_action_new("open-settings", NULL);
+	g_signal_connect(action, "activate", G_CALLBACK(open_adblock_settings), NULL);
+
+	WebKitContextMenuItem *item = webkit_context_menu_item_new_from_gaction(G_ACTION(action), "Settings", NULL);
+	webkit_context_menu_append(context_menu, item);
+
+	return TRUE;
+}
+
 static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPage *web_page, gpointer user_data)
 {
 	g_signal_connect(web_page, "send-request", G_CALLBACK(web_page_send_request), NULL);
 	g_signal_connect(web_page, "document-loaded", G_CALLBACK(document_loaded_callback), NULL);
+	g_signal_connect(web_page, "context-menu", G_CALLBACK(context_menu_opened_callback), NULL);
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
