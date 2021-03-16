@@ -2,7 +2,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-GSocket *sock;
+int sock;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
@@ -27,10 +27,10 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 	g_free(path);
 
 	gchar *req = g_strdup_printf("n %s %s %s\n", request_uri, page_uri, res_type);
-	g_socket_send_with_blocking(sock, req, strlen(req), TRUE, NULL, NULL);
+	write(sock, req, strlen(req));
 	g_free(req);
 	gchar buffer[1] = {0};
-	g_socket_receive_with_blocking(sock, buffer, 1, TRUE, NULL, NULL);
+	read(sock, buffer, 1);
 	// server returns '1' if the resource is an ad
 	return buffer[0] == '1';
 }
@@ -43,7 +43,7 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	JSCValue *classes = jsc_context_evaluate(js_context, "Array.from(new Set([].concat.apply([], Array.from(document.getElementsByTagName('*')).map(elem => Array.from(elem.classList))))).join('\t')", -1);
 	JSCValue *ids = jsc_context_evaluate(js_context, "Array.from(document.getElementsByTagName('*')).map(elem => elem.id).filter(elem => elem).join('\t')", -1);
 	gchar *req = g_strdup_printf("c %s %s %s\n", uri, jsc_value_to_string(ids), jsc_value_to_string(classes));
-	g_socket_send_with_blocking(sock, req, strlen(req), TRUE, NULL, NULL);
+	write(sock, req, strlen(req));
 	g_free(req);
 
 	GString *res = g_string_new("");
@@ -52,7 +52,7 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	do
 	{
 		gchar buffer[1024] = {0};
-		g_socket_receive_with_blocking(sock, buffer, 1023, TRUE, NULL, NULL);
+		read(sock, buffer, 1023);
 		end = strchr(buffer, '\n');
 		if (end)
 			*end = 0;
@@ -62,10 +62,10 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	if (res->len > 1)
 	{
 		g_string_prepend(res, "var link = document.createElement('link');"
-				"link.rel = 'stylesheet';"
-				"link.href = 'a';"
-				"document.head.appendChild(link);"
-				"window.onload = function () { link.sheet.insertRule(`");
+							  "link.rel = 'stylesheet';"
+							  "link.href = 'a';"
+							  "document.head.appendChild(link);"
+							  "window.onload = function () { link.sheet.insertRule(`");
 		g_string_append(res, "`); }");
 		jsc_context_evaluate(js_context, res->str, -1);
 		g_string_free(res, TRUE);
@@ -80,15 +80,15 @@ static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPa
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
 {
-	sock = g_socket_new(G_SOCKET_FAMILY_UNIX, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, NULL);
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+
 	struct sockaddr_un addr;
 	addr.sun_family = AF_UNIX;
 	memset(addr.sun_path, 0, sizeof(addr.sun_path));
 	strcpy(addr.sun_path, "/tmp/ars");
-	GSocketAddress *gaddr = g_socket_address_new_from_native(&addr, sizeof(addr));
 
 	// spawn server if it's not running
-	if (!g_socket_connect(sock, gaddr, NULL, NULL))
+	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1)
 	{
 		gchar *argv[] = {"adblock-rust-server", NULL};
 		gint out;
@@ -102,10 +102,8 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 		g_io_channel_read_line(out_chan, &line, NULL, NULL, NULL);
 		g_free(line);
 		g_io_channel_unref(out_chan);
-		g_socket_connect(sock, gaddr, NULL, NULL);
+		connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 	}
-
-	g_object_unref(gaddr);
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 }
