@@ -2,10 +2,17 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+// TODO get rid of global variables
 int sock;
+GtkWidget *settings;
+GtkWidget *enabled;
+JSCContext *js_context;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
+	if (!gtk_switch_get_state(GTK_SWITCH(enabled)))
+		return FALSE;
+
 	const char *request_uri = webkit_uri_request_get_uri(request);
 	const char *page_uri = webkit_web_page_get_uri(web_page);
 
@@ -37,9 +44,14 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 
 static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data)
 {
-	WebKitFrame *frame = webkit_web_page_get_main_frame(web_page);
-	JSCContext *js_context = webkit_frame_get_js_context(frame);
 	const gchar *uri = webkit_web_page_get_uri(web_page);
+
+	if (g_str_has_prefix(uri, "blockit://settings"))
+		gtk_widget_show_all(settings);
+
+	if (!gtk_switch_get_state(GTK_SWITCH(enabled)))
+		return;
+
 	JSCValue *classes = jsc_context_evaluate(js_context, "Array.from(new Set([].concat.apply([], Array.from(document.getElementsByTagName('*')).map(elem => Array.from(elem.classList))))).join('\t')", -1);
 	JSCValue *ids = jsc_context_evaluate(js_context, "Array.from(document.getElementsByTagName('*')).map(elem => elem.id).filter(elem => elem).join('\t')", -1);
 	gchar *req = g_strdup_printf("c %s %s %s\n", uri, jsc_value_to_string(ids), jsc_value_to_string(classes));
@@ -74,8 +86,23 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 
 static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPage *web_page, gpointer user_data)
 {
+	WebKitFrame *frame = webkit_web_page_get_main_frame(web_page);
+	js_context = webkit_frame_get_js_context(frame);
+
 	g_signal_connect(web_page, "send-request", G_CALLBACK(web_page_send_request), NULL);
 	g_signal_connect(web_page, "document-loaded", G_CALLBACK(document_loaded_callback), NULL);
+}
+
+void pick_elem(GtkWidget *widget, gpointer *data)
+{
+	gchar *script;
+	g_file_get_contents("script.js", &script, NULL, NULL);
+	jsc_context_evaluate(js_context, script, -1);
+}
+
+void hide_settings(GtkWidget *widget, gpointer *data)
+{
+	gtk_widget_hide(widget);
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
@@ -106,4 +133,10 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	}
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
+
+	GtkBuilder *builder = gtk_builder_new_from_file("gui.glade");
+	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
+	gtk_builder_connect_signals(builder, NULL);
+
+	enabled = GTK_WIDGET(gtk_builder_get_object(builder, "enabled"));
 }
