@@ -8,8 +8,8 @@ EXTLIBS = `pkg-config --cflags webkit2gtk-4.0 webkit2gtk-web-extension-4.0 glib-
 
 all: blockit.so
 
-blockit.so: blockit.c
-	$(CC) blockit.c -o blockit.so $(EXTFLAGS) $(EXTLIBS) $(CFLAGS)
+blockit.so: blockit.c gschema.c
+	$(CC) blockit.c gschema.c -o blockit.so $(EXTFLAGS) $(EXTLIBS) $(CFLAGS)
 
 install: all
 	mkdir -p $(DESTDIR)$(LIBDIR)

@@ -1,12 +1,14 @@
 #include <webkit2/webkit-web-extension.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include "gschema.h"
 
 // TODO get rid of global variables
 int sock;
 GtkWidget *settings;
 GtkWidget *enabled;
 JSCContext *js_context;
+const gchar *script;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
@@ -95,8 +97,6 @@ static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPa
 
 void pick_elem(GtkWidget *widget, gpointer *data)
 {
-	gchar *script;
-	g_file_get_contents("script.js", &script, NULL, NULL);
 	jsc_context_evaluate(js_context, script, -1);
 }
 
@@ -134,7 +134,13 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 
-	GtkBuilder *builder = gtk_builder_new_from_file("gui.glade");
+	GError *err = NULL;
+	gschema_register_resource();
+
+	GBytes *bytes = g_resources_lookup_data("/org/gtk/blockit/script.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
+	script = g_bytes_get_data(bytes, NULL);
+
+	GtkBuilder *builder = gtk_builder_new_from_resource("/org/gtk/blockit/gui.glade");
 	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
 	gtk_builder_connect_signals(builder, NULL);
 
