@@ -9,6 +9,7 @@ GtkWidget *settings;
 GtkWidget *enabled;
 JSCContext *js_context;
 const gchar *script;
+const gchar *block;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
@@ -17,6 +18,11 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 
 	const char *request_uri = webkit_uri_request_get_uri(request);
 	const char *page_uri = webkit_web_page_get_uri(web_page);
+
+	if (strcmp(page_uri, "blockit://settings") == 0) {
+		gtk_widget_show_all(settings);
+		return TRUE;
+	}
 
 	gchar *path;
 	g_uri_split(request_uri, G_URI_FLAGS_NONE, NULL, NULL, NULL, NULL, &path, NULL, NULL, NULL);
@@ -76,13 +82,28 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 	if (res->len > 1)
 	{
 		g_string_prepend(res, "var link = document.createElement('link');"
-							  "link.rel = 'stylesheet';"
-							  "link.href = 'a';"
-							  "document.head.appendChild(link);"
-							  "window.onload = function () { link.sheet.insertRule(`");
+				"link.rel = 'stylesheet';"
+				"link.href = 'a';"
+				"document.head.appendChild(link);"
+				"window.onload = function () { link.sheet.insertRule(`");
 		g_string_append(res, "`); }");
 		jsc_context_evaluate(js_context, res->str, -1);
 		g_string_free(res, TRUE);
+	}
+}
+
+static void console_message_sent_callback(WebKitWebPage *web_page, WebKitConsoleMessage *console_message, gpointer user_data) {
+	const gchar *msg = webkit_console_message_get_text(console_message);
+	if (g_str_has_prefix(msg, "blockit ")) {
+		const char *page_uri = webkit_web_page_get_uri(web_page);
+
+		gchar *path;
+		g_uri_split(page_uri, G_URI_FLAGS_NONE, NULL, NULL, &path, NULL, NULL, NULL, NULL, NULL);
+
+		GFile *file = g_file_new_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL));
+		GFileOutputStream *stream = g_file_append_to(file, G_FILE_CREATE_NONE, NULL, NULL);
+		const gchar *buf = g_strconcat(path, msg + 8, "\n", NULL);
+		g_output_stream_write(G_OUTPUT_STREAM(stream), buf, strlen(buf), NULL, NULL);
 	}
 }
 
@@ -93,6 +114,7 @@ static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPa
 
 	g_signal_connect(web_page, "send-request", G_CALLBACK(web_page_send_request), NULL);
 	g_signal_connect(web_page, "document-loaded", G_CALLBACK(document_loaded_callback), NULL);
+	g_signal_connect(web_page, "console-message-sent", G_CALLBACK(console_message_sent_callback), NULL);
 }
 
 void pick_elem(GtkWidget *widget, gpointer *data)
@@ -103,6 +125,30 @@ void pick_elem(GtkWidget *widget, gpointer *data)
 void hide_settings(GtkWidget *widget, gpointer *data)
 {
 	gtk_widget_hide(widget);
+}
+
+void block_elem(GtkWidget *widget, gpointer *data)
+{
+	jsc_context_evaluate(js_context, block, -1);
+	/* GFile *file = g_file_new_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/urls", NULL)); */
+	/* g_file_append_to(file, G_FILE_CREATE_NONE, NULL, NULL); */
+}
+
+void edit_lists(GtkWidget *widget, gpointer *data)
+{
+	// TODO FREE strconcat
+	GError *error = NULL;
+	if (!g_app_info_launch_default_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/urls", NULL), NULL, &error)) {
+		g_warning ("Failed to open uri: %s", error->message);
+	}
+}
+
+void edit_filters(GtkWidget *widget, gpointer *data)
+{
+	GError *error = NULL;
+	if (!g_app_info_launch_default_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL), NULL, &error)) {
+		g_warning ("Failed to open uri: %s", error->message);
+	}
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
@@ -134,15 +180,18 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 
-	GError *err = NULL;
 	gschema_register_resource();
-
 	GBytes *bytes = g_resources_lookup_data("/org/gtk/blockit/script.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
 	script = g_bytes_get_data(bytes, NULL);
+
+	bytes = g_resources_lookup_data("/org/gtk/blockit/block.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
+	block = g_bytes_get_data(bytes, NULL);
 
 	GtkBuilder *builder = gtk_builder_new_from_resource("/org/gtk/blockit/gui.glade");
 	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
 	gtk_builder_connect_signals(builder, NULL);
 
 	enabled = GTK_WIDGET(gtk_builder_get_object(builder, "enabled"));
+
+	/* gtk_widget_show_all(settings); */
 }
