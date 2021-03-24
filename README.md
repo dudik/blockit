@@ -1,5 +1,11 @@
 # blocKit
-WebKitGTK adblock extension with Brave's Rust-based adblock engine for backend. Supports both network and cosmetic filtering.
+> WebKitGTK adblock extension with Brave's Rust-based adblock engine for backend.
+
+## Features
+* Network and cosmetic filtering
+* Simple GUI
+* Automatic filter lists updating
+* Element picker/zapper
 
 ## Installation
 1. Install [adblock-rust-server](https://crates.io/crates/adblock-rust-server):
