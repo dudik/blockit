@@ -1,15 +1,15 @@
 #include <webkit2/webkit-web-extension.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include "gschema.h"
+#include "resources/gschema.h"
 
 // TODO get rid of global variables
 int sock;
 GtkWidget *settings;
 GtkWidget *enabled;
 JSCContext *js_context;
-const gchar *script;
-const gchar *block;
+const gchar *zap_js;
+const gchar *block_js;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
@@ -119,7 +119,7 @@ static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPa
 
 void pick_elem(GtkWidget *widget, gpointer *data)
 {
-	jsc_context_evaluate(js_context, script, -1);
+	jsc_context_evaluate(js_context, zap_js, -1);
 }
 
 void hide_settings(GtkWidget *widget, gpointer *data)
@@ -129,26 +129,29 @@ void hide_settings(GtkWidget *widget, gpointer *data)
 
 void block_elem(GtkWidget *widget, gpointer *data)
 {
-	jsc_context_evaluate(js_context, block, -1);
-	/* GFile *file = g_file_new_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/urls", NULL)); */
-	/* g_file_append_to(file, G_FILE_CREATE_NONE, NULL, NULL); */
+	jsc_context_evaluate(js_context, block_js, -1);
 }
 
 void edit_lists(GtkWidget *widget, gpointer *data)
 {
-	// TODO FREE strconcat
 	GError *error = NULL;
-	if (!g_app_info_launch_default_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/urls", NULL), NULL, &error)) {
-		g_warning ("Failed to open uri: %s", error->message);
-	}
+	gchar *uri = g_strconcat("file:///", g_get_user_config_dir(), "/ars/urls", NULL);
+
+	if (!g_app_info_launch_default_for_uri(uri, NULL, &error))
+		g_warning("Failed to open filter lists file: %s", error->message);
+
+	g_free(uri);
 }
 
 void edit_filters(GtkWidget *widget, gpointer *data)
 {
 	GError *error = NULL;
-	if (!g_app_info_launch_default_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL), NULL, &error)) {
-		g_warning ("Failed to open uri: %s", error->message);
-	}
+	gchar *uri = g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL);
+
+	if (!g_app_info_launch_default_for_uri(uri, NULL, &error))
+		g_warning("Failed to open custom filters file: %s", error->message);
+
+	g_free(uri);
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
@@ -164,34 +167,31 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1)
 	{
 		gchar *argv[] = {"adblock-rust-server", NULL};
-		gint out;
+		gint stdout;
 
 		// "disable" extension if server can't be started
-		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL))
+		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &stdout, NULL, NULL))
 			return;
 
-		GIOChannel *out_chan = g_io_channel_unix_new(out);
+		// wait until server prints out the 'init-done' line and try connecting to the server again
+		GIOChannel *stdout_chan = g_io_channel_unix_new(stdout);
 		gchar *line;
-		g_io_channel_read_line(out_chan, &line, NULL, NULL, NULL);
+		g_io_channel_read_line(stdout_chan, &line, NULL, NULL, NULL);
 		g_free(line);
-		g_io_channel_unref(out_chan);
+		g_io_channel_unref(stdout_chan);
 		connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 	}
 
 	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 
-	gschema_register_resource();
-	GBytes *bytes = g_resources_lookup_data("/org/gtk/blockit/script.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-	script = g_bytes_get_data(bytes, NULL);
+	GBytes *bytes = g_resources_lookup_data("/resources/scripts/zap.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
+	zap_js = g_bytes_get_data(bytes, NULL);
 
-	bytes = g_resources_lookup_data("/org/gtk/blockit/block.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-	block = g_bytes_get_data(bytes, NULL);
+	bytes = g_resources_lookup_data("/resources/scripts/block.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
+	block_js = g_bytes_get_data(bytes, NULL);
 
-	GtkBuilder *builder = gtk_builder_new_from_resource("/org/gtk/blockit/gui.glade");
-	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
+	GtkBuilder *builder = gtk_builder_new_from_resource("/resources/gui.glade");
 	gtk_builder_connect_signals(builder, NULL);
-
+	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
 	enabled = GTK_WIDGET(gtk_builder_get_object(builder, "enabled"));
-
-	/* gtk_widget_show_all(settings); */
 }

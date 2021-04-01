@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<gresources>
-	<gresource prefix="/org/gtk/blockit">
-		<file compressed="true">gui.glade</file>
-		<file compressed="true">script.js</file>
-		<file compressed="true">block.js</file>
-	</gresource>
-</gresources>
