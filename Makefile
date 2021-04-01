@@ -9,7 +9,7 @@ EXTLIBS = `pkg-config --cflags webkit2gtk-4.0 webkit2gtk-web-extension-4.0 glib-
 all: blockit.so
 
 blockit.so: blockit.c resources/gschema.c resources/gschema.h
-	$(CC) $^ -o blockit.so $(EXTFLAGS) $(EXTLIBS) $(CFLAGS)
+	$(CC) blockit.c resources/gschema.c -o blockit.so $(EXTFLAGS) $(EXTLIBS) $(CFLAGS)
 
 resources/gschema.c: resources/gschema.xml resources/gui.glade resources/scripts/*
 	glib-compile-resources --generate-source resources/gschema.xml
