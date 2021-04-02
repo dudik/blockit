@@ -10,6 +10,7 @@ GtkWidget *enabled;
 JSCContext *js_context;
 const gchar *zap_js;
 const gchar *block_js;
+const gchar *config_dir;
 
 static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest *request, WebKitURIResponse *redirected_response, gpointer user_data)
 {
@@ -18,11 +19,6 @@ static gboolean web_page_send_request(WebKitWebPage *web_page, WebKitURIRequest 
 
 	const char *request_uri = webkit_uri_request_get_uri(request);
 	const char *page_uri = webkit_web_page_get_uri(web_page);
-
-	if (strcmp(page_uri, "blockit://settings") == 0) {
-		gtk_widget_show_all(settings);
-		return TRUE;
-	}
 
 	gchar *path;
 	g_uri_split(request_uri, G_URI_FLAGS_NONE, NULL, NULL, NULL, NULL, &path, NULL, NULL, NULL);
@@ -94,16 +90,21 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 
 static void console_message_sent_callback(WebKitWebPage *web_page, WebKitConsoleMessage *console_message, gpointer user_data) {
 	const gchar *msg = webkit_console_message_get_text(console_message);
+
 	if (g_str_has_prefix(msg, "blockit ")) {
+		// append cosmetic rule to custom filters
 		const char *page_uri = webkit_web_page_get_uri(web_page);
 
 		gchar *path;
 		g_uri_split(page_uri, G_URI_FLAGS_NONE, NULL, NULL, &path, NULL, NULL, NULL, NULL, NULL);
 
-		GFile *file = g_file_new_for_uri(g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL));
+		gchar *uri = g_strconcat("file:///", g_get_user_config_dir(), "/ars/lists/custom", NULL);
+		GFile *file = g_file_new_for_uri(uri);
+		g_free(uri);
 		GFileOutputStream *stream = g_file_append_to(file, G_FILE_CREATE_NONE, NULL, NULL);
-		const gchar *buf = g_strconcat(path, msg + 8, "\n", NULL);
+		gchar *buf = g_strconcat(path, msg + 8, "\n", NULL);
 		g_output_stream_write(G_OUTPUT_STREAM(stream), buf, strlen(buf), NULL, NULL);
+		g_free(buf);
 	}
 }
 
@@ -117,14 +118,14 @@ static void web_page_created_callback(WebKitWebExtension *extension, WebKitWebPa
 	g_signal_connect(web_page, "console-message-sent", G_CALLBACK(console_message_sent_callback), NULL);
 }
 
-void pick_elem(GtkWidget *widget, gpointer *data)
-{
-	jsc_context_evaluate(js_context, zap_js, -1);
-}
-
 void hide_settings(GtkWidget *widget, gpointer *data)
 {
 	gtk_widget_hide(widget);
+}
+
+void pick_elem(GtkWidget *widget, gpointer *data)
+{
+	jsc_context_evaluate(js_context, zap_js, -1);
 }
 
 void block_elem(GtkWidget *widget, gpointer *data)
@@ -182,7 +183,7 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 		connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 	}
 
-	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
+	config_dir = g_get_user_config_dir();
 
 	GBytes *bytes = g_resources_lookup_data("/resources/scripts/zap.js", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
 	zap_js = g_bytes_get_data(bytes, NULL);
@@ -194,4 +195,6 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 	gtk_builder_connect_signals(builder, NULL);
 	settings = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
 	enabled = GTK_WIDGET(gtk_builder_get_object(builder, "enabled"));
+
+	g_signal_connect(extension, "page-created", G_CALLBACK(web_page_created_callback), NULL);
 }
