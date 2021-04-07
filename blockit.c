@@ -102,7 +102,7 @@ static void console_message_sent_callback(WebKitWebPage *web_page, WebKitConsole
 		GFile *file = g_file_new_for_uri(uri);
 		g_free(uri);
 		GFileOutputStream *stream = g_file_append_to(file, G_FILE_CREATE_NONE, NULL, NULL);
-		gchar *buf = g_strconcat(path, msg + 8, "\n", NULL);
+		gchar *buf = g_strconcat("\n", path, msg + 8, "\n", NULL);
 		g_output_stream_write(G_OUTPUT_STREAM(stream), buf, strlen(buf), NULL, NULL);
 		g_free(buf);
 	}
@@ -153,6 +153,22 @@ void edit_filters(GtkWidget *widget, gpointer *data)
 		g_warning("Failed to open custom filters file: %s", error->message);
 
 	g_free(uri);
+}
+
+void reload_server(GtkWidget *widget, gpointer *data)
+{
+	gtk_widget_set_sensitive(widget, FALSE);
+	write(sock, "r\n", 2);
+	read(sock, NULL, 1);
+	gtk_widget_set_sensitive(widget, TRUE);
+}
+
+void force_update(GtkWidget *widget, gpointer *data)
+{
+	gtk_widget_set_sensitive(widget, FALSE);
+	write(sock, "u\n", 2);
+	read(sock, NULL, 1);
+	gtk_widget_set_sensitive(widget, TRUE);
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extension)
