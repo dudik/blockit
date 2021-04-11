@@ -50,7 +50,7 @@ static void document_loaded_callback(WebKitWebPage *web_page, gpointer user_data
 {
 	const gchar *uri = webkit_web_page_get_uri(web_page);
 
-	if (g_str_has_prefix(uri, "blockit://settings"))
+	if (strstr(uri, "blockit") && g_str_has_suffix(uri, "settings"))
 		gtk_widget_show_all(settings);
 
 	if (!gtk_switch_get_state(GTK_SWITCH(enabled)))
