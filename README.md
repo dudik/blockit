@@ -1,4 +1,4 @@
-# blocKit
+# BlocKit
 > WebKitGTK adblock extension with Brave's Rust-based adblock engine for backend.
 
 ## Features
