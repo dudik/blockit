@@ -187,8 +187,12 @@ G_MODULE_EXPORT void webkit_web_extension_initialize(WebKitWebExtension *extensi
 		gint out;
 
 		// "disable" extension if server can't be started
-		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL))
+		if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &out, NULL, NULL)) {
+			GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_NONE, "adblock-rust-server could not be started");
+			gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), "adblock-rust-server isn't running and couldn't be started. Please check that it is installed and accessible from $PATH. You can install it with cargo: 'cargo install adblock-rust-server'.");
+			gtk_widget_show(dialog);
 			return;
+		}
 
 		// wait until server prints out the 'init-done' line and try connecting to the server again
 		GIOChannel *out_chan = g_io_channel_unix_new(out);
