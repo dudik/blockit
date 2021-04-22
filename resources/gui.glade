@@ -22,6 +22,7 @@
           <object class="GtkSwitch" id="enabled">
             <property name="visible">True</property>
             <property name="can-focus">True</property>
+            <property name="tooltip-text" translatable="yes">Enable/disable BlocKit</property>
             <property name="halign">center</property>
             <property name="valign">center</property>
             <property name="active">True</property>
@@ -45,6 +46,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Temporarily remove element</property>
                 <signal name="clicked" handler="pick_elem" swapped="no"/>
               </object>
               <packing>
@@ -59,6 +61,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Permanently remove element</property>
                 <signal name="clicked" handler="block_elem" swapped="no"/>
               </object>
               <packing>
@@ -87,6 +90,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Open filter lists file</property>
                 <signal name="clicked" handler="edit_lists" swapped="no"/>
               </object>
               <packing>
@@ -101,6 +105,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Open custom filters file</property>
                 <signal name="clicked" handler="edit_filters" swapped="no"/>
               </object>
               <packing>
@@ -129,6 +134,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Reload engine applying any changes made to the configuration</property>
                 <signal name="clicked" handler="reload_server" swapped="no"/>
               </object>
               <packing>
@@ -143,6 +149,7 @@
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Forcefully update every filter list and reload engine</property>
                 <signal name="clicked" handler="force_update" swapped="no"/>
               </object>
               <packing>
