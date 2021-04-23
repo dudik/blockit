@@ -159,7 +159,8 @@ void reload_server(GtkWidget *widget, gpointer *data)
 {
 	gtk_widget_set_sensitive(widget, FALSE);
 	write(sock, "r\n", 2);
-	read(sock, NULL, 1);
+	gchar buffer[1] = {0};
+	read(sock, buffer, 1);
 	gtk_widget_set_sensitive(widget, TRUE);
 }
 
@@ -167,7 +168,8 @@ void force_update(GtkWidget *widget, gpointer *data)
 {
 	gtk_widget_set_sensitive(widget, FALSE);
 	write(sock, "u\n", 2);
-	read(sock, NULL, 1);
+	gchar buffer[1] = {0};
+	read(sock, buffer, 1);
 	gtk_widget_set_sensitive(widget, TRUE);
 }
 
